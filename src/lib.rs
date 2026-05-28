@@ -1,3 +1,4 @@
+mod codecs;
 mod dsp;
 mod loader;
 mod params;

@@ -34,6 +34,8 @@ symphonia = { version = "0.6", default-features = false, features = [
 rlobkit-core = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-core" }
 rlobkit-dialogs = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-dialogs" }
 
+symphonia-adapter-mousiki = { git = "https://github.com/mlm-games/symphonia-adapter-mousiki" }
+
 tokio = { version = "1", default-features = false, features = ["rt"] }
 
 [profile.release]

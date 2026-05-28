@@ -282,7 +282,7 @@ pub fn load_wave_from_path(path: &Path) -> Result<Arc<Wave>, String> {
 
     let track_id = track.id;
 
-    let mut decoder = symphonia::default::get_codecs()
+    let mut decoder = crate::codecs::get_codecs()
         .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
         .map_err(|e| format!("No decoder for '{}': {}", path.display(), e))?;
 
