@@ -38,6 +38,10 @@ symphonia-adapter-mousiki = { git = "https://github.com/mlm-games/symphonia-adap
 
 tokio = { version = "1", default-features = false, features = ["rt"] }
 
+# [patch."https://github.com/mlm-games/rlobkit"]
+# rlobkit-dialogs = { path = "../rlobkit/rlobkit-dialogs" }
+# rlobkit-core = { path = "../rlobkit/rlobkit-core" }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
