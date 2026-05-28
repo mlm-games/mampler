@@ -4,13 +4,13 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use symphonia::core::audio::SampleBuffer;
-use symphonia::core::codecs::DecoderOptions;
+use symphonia::core::codecs::CodecParameters;
+use symphonia::core::codecs::audio::{AudioDecoderOptions, CODEC_ID_NULL_AUDIO};
 use symphonia::core::errors::Error as SymphoniaError;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::{FormatOptions, TrackType};
 use symphonia::core::io::{MediaSourceStream, ReadOnlySource};
 use symphonia::core::meta::MetadataOptions;
-use symphonia::core::probe::Hint;
 
 const AUDIO_EXTS: &[&str] = &[
     "wav", "flac", "ogg", "mp3", "aac", "m4a", "alac", "aiff", "aif",
@@ -111,8 +111,8 @@ pub fn import_audio_to_slot_with_picker(slot: usize) -> Result<PathBuf, String> 
 }
 
 pub fn load_slot(slot: usize) -> Result<Arc<Wave>, String> {
-    let path = find_slot_file(slot)
-        .ok_or_else(|| format!("No audio file in slot {}", slot.min(127)))?;
+    let path =
+        find_slot_file(slot).ok_or_else(|| format!("No audio file in slot {}", slot.min(127)))?;
 
     load_wave_from_path(&path)
 }
@@ -145,7 +145,9 @@ fn is_supported_audio_ext(ext: &str) -> bool {
 fn pick_audio_file() -> Result<PathBuf, String> {
     rlobkit_dialogs::blocking_open_file(
         "Pick audio file",
-        &["wav", "flac", "ogg", "mp3", "aac", "m4a", "alac", "aiff", "aif"],
+        &[
+            "wav", "flac", "ogg", "mp3", "aac", "m4a", "alac", "aiff", "aif",
+        ],
     )
     .ok_or_else(|| "No file picked".to_string())
 }
@@ -187,26 +189,36 @@ fn pick_audio_file() -> Result<PathBuf, String> {
         "wav".to_string()
     };
 
-    let temp = std::env::temp_dir().join(format!("mampler_picked_{}.{}", sanitize_name(&name), ext));
+    let temp =
+        std::env::temp_dir().join(format!("mampler_picked_{}.{}", sanitize_name(&name), ext));
 
-    RlobKit::read_file_to_path(&file, &temp)
-        .map_err(|e| e.to_string())?;
+    RlobKit::read_file_to_path(&file, &temp).map_err(|e| e.to_string())?;
 
     Ok(temp)
 }
 
 #[cfg(not(target_os = "android"))]
 fn copy_picked_file_to_path(source: &Path, dest: &Path) -> Result<(), String> {
-    fs::copy(source, dest)
-        .map(|_| ())
-        .map_err(|e| format!("Failed to copy '{}' to '{}': {}", source.display(), dest.display(), e))
+    fs::copy(source, dest).map(|_| ()).map_err(|e| {
+        format!(
+            "Failed to copy '{}' to '{}': {}",
+            source.display(),
+            dest.display(),
+            e
+        )
+    })
 }
 
 #[cfg(target_os = "android")]
 fn copy_picked_file_to_path(source: &Path, dest: &Path) -> Result<(), String> {
-    fs::copy(source, dest)
-        .map(|_| ())
-        .map_err(|e| format!("Failed to copy '{}' to '{}': {}", source.display(), dest.display(), e))
+    fs::copy(source, dest).map(|_| ()).map_err(|e| {
+        format!(
+            "Failed to copy '{}' to '{}': {}",
+            source.display(),
+            dest.display(),
+            e
+        )
+    })
 }
 
 #[cfg(target_os = "android")]
@@ -223,8 +235,8 @@ fn sanitize_name(name: &str) -> String {
 }
 
 pub fn load_wave_from_path(path: &Path) -> Result<Arc<Wave>, String> {
-    let file = fs::File::open(path)
-        .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+    let file =
+        fs::File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
 
     let size = file.metadata().map(|m| m.len()).unwrap_or(0);
 
@@ -239,12 +251,12 @@ pub fn load_wave_from_path(path: &Path) -> Result<Arc<Wave>, String> {
         hint.with_extension(ext);
     }
 
-    let probed = symphonia::default::get_probe()
-        .format(
+    let mut format = symphonia::default::get_probe()
+        .probe(
             &hint,
             mss,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )
         .map_err(|e| {
             format!(
@@ -255,37 +267,37 @@ pub fn load_wave_from_path(path: &Path) -> Result<Arc<Wave>, String> {
             )
         })?;
 
-    let mut format = probed.format;
-
     let track = format
-        .tracks()
-        .iter()
-        .find(|track| track.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+        .default_track(TrackType::Audio)
         .ok_or_else(|| format!("No audio track in '{}'", path.display()))?;
 
+    let audio_params = match &track.codec_params {
+        Some(CodecParameters::Audio(p)) => p,
+        _ => return Err(format!("No audio codec parameters in '{}'", path.display())),
+    };
+
+    if audio_params.codec == CODEC_ID_NULL_AUDIO {
+        return Err(format!("Null audio codec in '{}'", path.display()));
+    }
+
     let track_id = track.id;
-    let codec_params = track.codec_params.clone();
 
     let mut decoder = symphonia::default::get_codecs()
-        .make(&codec_params, &DecoderOptions::default())
+        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
         .map_err(|e| format!("No decoder for '{}': {}", path.display(), e))?;
 
     let mut output = Vec::<f32>::new();
-    let mut sample_rate = codec_params.sample_rate.unwrap_or(0);
+    let mut sample_rate = audio_params.sample_rate.unwrap_or(0);
 
     loop {
         let packet = match format.next_packet() {
-            Ok(packet) => packet,
-            Err(SymphoniaError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                break;
-            }
-            Err(SymphoniaError::ResetRequired) => {
-                continue;
-            }
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            Err(SymphoniaError::ResetRequired) => continue,
             Err(_) => break,
         };
 
-        if packet.track_id() != track_id {
+        if packet.track_id != track_id {
             continue;
         }
 
@@ -295,20 +307,18 @@ pub fn load_wave_from_path(path: &Path) -> Result<Arc<Wave>, String> {
             Err(_) => continue,
         };
 
-        let frames = decoded.frames();
-        let spec = *decoded.spec();
-        let channels = spec.channels.count().max(1);
+        let spec = decoded.spec();
+        let channels = spec.channels().count().max(1);
 
         if sample_rate == 0 {
-            sample_rate = spec.rate;
+            sample_rate = spec.rate();
         }
 
-        let mut buffer = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-        buffer.copy_interleaved_ref(decoded);
+        let mut samples = Vec::<f32>::new();
+        decoded.copy_to_vec_interleaved(&mut samples);
 
-        let samples = buffer.samples();
         let available_frames = samples.len() / channels;
-        let frames = frames.min(available_frames);
+        let frames = decoded.frames().min(available_frames);
 
         for frame in 0..frames {
             let base = frame * channels;
