@@ -61,7 +61,7 @@ pub fn find_slot_file(slot: usize) -> Option<PathBuf> {
             continue;
         };
 
-        if stem == prefix && is_supported_audio_ext(ext) {
+        if stem.starts_with(&prefix) && is_supported_audio_ext(ext) {
             candidates.push(path);
         }
     }
@@ -72,12 +72,19 @@ pub fn find_slot_file(slot: usize) -> Option<PathBuf> {
 
 pub fn slot_display_name(slot: usize) -> String {
     if let Some(path) = find_slot_file(slot) {
+        let prefix = slot_prefix(slot);
         let name = path
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("<file>");
 
-        format!("{:03}: {}", slot.min(127), name)
+        let display = if let Some(rest) = name.strip_prefix(&format!("{}_", prefix)) {
+            rest.to_string()
+        } else {
+            name.to_string()
+        };
+
+        format!("{:03}: {}", slot.min(127), display)
     } else {
         format!("{:03}: Empty", slot.min(127))
     }
@@ -101,9 +108,14 @@ pub fn import_audio_to_slot_with_picker(slot: usize) -> Result<PathBuf, String> 
         String::from("wav")
     };
 
+    let original_stem = picked
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audio");
+
     remove_existing_slot_files(slot)?;
 
-    let dest = root.join(format!("{}.{}", slot_prefix(slot), ext));
+    let dest = root.join(format!("{}_{}.{}", slot_prefix(slot), original_stem, ext));
 
     copy_picked_file_to_path(&picked, &dest)?;
 
@@ -128,7 +140,7 @@ fn remove_existing_slot_files(slot: usize) -> Result<(), String> {
             continue;
         };
 
-        if stem == prefix {
+        if stem.starts_with(&prefix) {
             let _ = fs::remove_file(path);
         }
     }
