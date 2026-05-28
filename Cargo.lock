@@ -1547,7 +1547,7 @@ dependencies = [
 [[package]]
 name = "rlobkit-core"
 version = "0.1.2"
-source = "git+https://github.com/mlm-games/rlobkit#955b34940778a4a6e0666d368d76163f5d6fda8b"
+source = "git+https://github.com/mlm-games/rlobkit#fc4662c9f379e3939d3550ebd089682aebe291ec"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1560,7 +1560,7 @@ dependencies = [
 [[package]]
 name = "rlobkit-dialogs"
 version = "0.1.2"
-source = "git+https://github.com/mlm-games/rlobkit#955b34940778a4a6e0666d368d76163f5d6fda8b"
+source = "git+https://github.com/mlm-games/rlobkit#fc4662c9f379e3939d3550ebd089682aebe291ec"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1569,6 +1569,7 @@ dependencies = [
  "jni-min-helper",
  "log",
  "mime_guess",
+ "ndk-context",
  "pollster",
  "rfd",
  "rlobkit-core",
