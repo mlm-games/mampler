@@ -94,7 +94,7 @@ pub fn import_audio_to_slot_with_picker(slot: usize) -> Result<PathBuf, String> 
     let slot = slot.min(127);
     let root = ensure_slot_root().map_err(|e| e.to_string())?;
 
-    let picked = pick_audio_file()?;
+    let (picked, original_stem) = pick_audio_file()?;
 
     let ext = picked
         .extension()
@@ -108,16 +108,18 @@ pub fn import_audio_to_slot_with_picker(slot: usize) -> Result<PathBuf, String> 
         String::from("wav")
     };
 
-    let original_stem = picked
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("audio");
-
     remove_existing_slot_files(slot)?;
 
     let dest = root.join(format!("{}_{}.{}", slot_prefix(slot), original_stem, ext));
 
-    copy_picked_file_to_path(&picked, &dest)?;
+    fs::copy(&picked, &dest).map_err(|e| {
+        format!(
+            "Failed to copy '{}' to '{}': {}",
+            picked.display(),
+            dest.display(),
+            e
+        )
+    })?;
 
     Ok(dest)
 }
@@ -154,18 +156,26 @@ fn is_supported_audio_ext(ext: &str) -> bool {
 }
 
 #[cfg(not(target_os = "android"))]
-fn pick_audio_file() -> Result<PathBuf, String> {
-    rlobkit_dialogs::blocking_open_file(
+fn pick_audio_file() -> Result<(PathBuf, String), String> {
+    let path = rlobkit_dialogs::blocking_open_file(
         "Pick audio file",
         &[
             "wav", "flac", "ogg", "mp3", "aac", "m4a", "alac", "aiff", "aif",
         ],
     )
-    .ok_or_else(|| "No file picked".to_string())
+    .ok_or_else(|| "No file picked".to_string())?;
+
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audio")
+        .to_string();
+
+    Ok((path, stem))
 }
 
 #[cfg(target_os = "android")]
-fn pick_audio_file() -> Result<PathBuf, String> {
+fn pick_audio_file() -> Result<(PathBuf, String), String> {
     use rlobkit_dialogs::{RlobKit, RlobKitType};
 
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -201,36 +211,21 @@ fn pick_audio_file() -> Result<PathBuf, String> {
         "wav".to_string()
     };
 
-    let temp =
-        std::env::temp_dir().join(format!("mampler_picked_{}.{}", sanitize_name(&name), ext));
+    let stem = name
+        .rfind('.')
+        .map(|pos| &name[..pos])
+        .unwrap_or(&name)
+        .to_string();
+
+    let temp = std::env::temp_dir().join(format!(
+        "mampler_picked_{}.{}",
+        sanitize_name(&stem),
+        ext
+    ));
 
     RlobKit::read_file_to_path(&file, &temp).map_err(|e| e.to_string())?;
 
-    Ok(temp)
-}
-
-#[cfg(not(target_os = "android"))]
-fn copy_picked_file_to_path(source: &Path, dest: &Path) -> Result<(), String> {
-    fs::copy(source, dest).map(|_| ()).map_err(|e| {
-        format!(
-            "Failed to copy '{}' to '{}': {}",
-            source.display(),
-            dest.display(),
-            e
-        )
-    })
-}
-
-#[cfg(target_os = "android")]
-fn copy_picked_file_to_path(source: &Path, dest: &Path) -> Result<(), String> {
-    fs::copy(source, dest).map(|_| ()).map_err(|e| {
-        format!(
-            "Failed to copy '{}' to '{}': {}",
-            source.display(),
-            dest.display(),
-            e
-        )
-    })
+    Ok((temp, stem))
 }
 
 #[cfg(target_os = "android")]

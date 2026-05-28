@@ -1,6 +1,6 @@
 [package]
 name = "mampler"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 license = "MIT"
 authors = ["mlm-games"]
@@ -28,7 +28,7 @@ symphonia = { version = "0.6", default-features = false, features = [
     "alac",
     "isomp4",
     "pcm",
-    "adpcm"
+    "adpcm",
 ] }
 
 rlobkit-core = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-core" }
