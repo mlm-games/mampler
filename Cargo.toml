@@ -1,6 +1,44 @@
 [package]
 name = "mampler"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
+license = "MIT"
+authors = ["mlm-games"]
+description = "Non-UI TX16Wx-style single-file sampler with persistent slots and rlobkit import"
+
+[lib]
+crate-type = ["cdylib"]
 
 [dependencies]
+dirs = "6.0"
+crossbeam = "0.8"
+
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", branch = "master" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+symphonia = { version = "0.5", default-features = false, features = [
+    "wav",
+    "flac",
+    "ogg",
+    "vorbis",
+    "mp3",
+    "aac",
+    "alac",
+    "isomp4",
+    "pcm",
+    "adpcm"
+] }
+
+rlobkit-core = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-core" }
+rlobkit-dialogs = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-dialogs" }
+
+tokio = { version = "1", default-features = false, features = ["rt"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = 3
+panic = "abort"
+strip = "symbols"
