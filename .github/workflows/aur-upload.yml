@@ -1,0 +1,58 @@
+name: Publish to AUR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  update-aur:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version and prepare PKGBUILD
+        id: prep
+        run: |
+          set -euo pipefail
+          
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION=$(curl -sf "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')
+          fi
+          VERSION="${VERSION#v}"
+          
+          wget -O Mampler-linux.clap "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/Mampler-linux.clap"
+          HASH=$(sha256sum Mampler-linux.clap | cut -d' ' -f1)
+          
+          # Generate PKGBUILD (pkgrel is auto-determined by action)
+          cat > PKGBUILD << EOF
+          # Maintainer: MLM-stuff <gfxoxinzh@mozmail.com>
+          pkgname=mampler-clap-bin
+          pkgver=${VERSION}
+          pkgrel=1
+          pkgdesc="Headless Rust CLAP sfz instrument loader"
+          arch=('x86_64')
+          url="https://github.com/mlm-games/mampler-clap"
+          license=('MIT')
+          depends=('glibc')
+          source=("Mampler-\${pkgver}.clap::https://github.com/mlm-games/mampler-clap/releases/download/v\${pkgver}/Mampler-linux.clap")
+          sha256sums=('${HASH}')
+          
+          package() {
+            install -Dm755 "\${srcdir}/Mampler-\${pkgver}.clap" "\${pkgdir}/usr/lib/clap/Mampler.clap"
+          }
+          EOF
+          
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to AUR
+        uses: mlm-games/aur-deploy-action@master
+        with:
+          pkgbuild: ./PKGBUILD
+          auto_pkgrel: true
+          commit_username: MLM-stuff
+          commit_email: gfxoxinzh@mozmail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to v${{ steps.prep.outputs.version }}"
