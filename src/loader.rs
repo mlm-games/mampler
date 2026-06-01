@@ -94,7 +94,7 @@ pub fn import_audio_to_slot_with_picker(slot: usize) -> Result<PathBuf, String> 
     let slot = slot.min(127);
     let root = ensure_slot_root().map_err(|e| e.to_string())?;
 
-    let (picked, original_stem) = pick_audio_file()?;
+    let (picked, original_stem, is_temp) = pick_audio_file()?;
 
     let ext = picked
         .extension()
@@ -112,16 +112,20 @@ pub fn import_audio_to_slot_with_picker(slot: usize) -> Result<PathBuf, String> 
 
     let dest = root.join(format!("{}_{}.{}", slot_prefix(slot), original_stem, ext));
 
-    fs::copy(&picked, &dest).map_err(|e| {
+    let copy_result = fs::copy(&picked, &dest).map_err(|e| {
         format!(
             "Failed to copy '{}' to '{}': {}",
             picked.display(),
             dest.display(),
             e
         )
-    })?;
+    });
 
-    Ok(dest)
+    if is_temp {
+        let _ = fs::remove_file(&picked);
+    }
+
+    copy_result.map(|_| dest)
 }
 
 pub fn load_slot(slot: usize) -> Result<Arc<Wave>, String> {
@@ -156,7 +160,7 @@ fn is_supported_audio_ext(ext: &str) -> bool {
 }
 
 #[cfg(not(target_os = "android"))]
-fn pick_audio_file() -> Result<(PathBuf, String), String> {
+fn pick_audio_file() -> Result<(PathBuf, String, bool), String> {
     let path = rlobkit_dialogs::blocking_open_file(
         "Pick audio file",
         &[
@@ -171,11 +175,11 @@ fn pick_audio_file() -> Result<(PathBuf, String), String> {
         .unwrap_or("audio")
         .to_string();
 
-    Ok((path, stem))
+    Ok((path, stem, false))
 }
 
 #[cfg(target_os = "android")]
-fn pick_audio_file() -> Result<(PathBuf, String), String> {
+fn pick_audio_file() -> Result<(PathBuf, String, bool), String> {
     use rlobkit_dialogs::{RlobKit, RlobKitType};
 
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -223,7 +227,7 @@ fn pick_audio_file() -> Result<(PathBuf, String), String> {
 
     RlobKit::read_file_to_path(&file, &temp).map_err(|e| e.to_string())?;
 
-    Ok((temp, stem))
+    Ok((temp, stem, true))
 }
 
 #[cfg(target_os = "android")]
