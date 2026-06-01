@@ -196,13 +196,11 @@ fn pick_audio_file() -> Result<(PathBuf, String), String> {
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No file picked".to_string())?;
 
-    let name = file
-        .name()
-        .unwrap_or_else(|| "picked_audio.wav".to_string());
+    let name = file.name();
 
     let ext = file
         .extension()
-        .unwrap_or_else(|| "wav".to_string())
+        .unwrap_or("wav")
         .to_ascii_lowercase();
 
     let ext = if is_supported_audio_ext(&ext) {
