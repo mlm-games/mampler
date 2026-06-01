@@ -40,7 +40,7 @@ struct LoaderMessage {
     wave: Arc<Wave>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum LoaderTask {
     PickToSlot(usize),
     LoadSlot(usize),
@@ -202,13 +202,7 @@ impl Plugin for Mampler {
                 let bend_norm = self.channels[ch].pitch_bend_norm;
                 let bend_st = bend_norm * bend_range;
 
-                let (l, r) = voice.render(
-                    filter_mode,
-                    cutoff,
-                    resonance,
-                    bend_st,
-                    tune,
-                );
+                let (l, r) = voice.render(filter_mode, cutoff, resonance, bend_st, tune);
 
                 out_l += l;
                 out_r += r;
@@ -253,16 +247,14 @@ impl Plugin for Mampler {
                     }
                 }
             }
-            LoaderTask::LoadSlot(slot) => {
-                match loader::load_slot(slot) {
-                    Ok(wave) => {
-                        let _ = tx.push(LoaderMessage { slot, wave });
-                    }
-                    Err(err) => {
-                        nih_plug::nih_log!("Mampler: slot {} empty/unloadable: {}", slot, err);
-                    }
+            LoaderTask::LoadSlot(slot) => match loader::load_slot(slot) {
+                Ok(wave) => {
+                    let _ = tx.push(LoaderMessage { slot, wave });
                 }
-            }
+                Err(err) => {
+                    nih_plug::nih_log!("Mampler: slot {} empty/unloadable: {}", slot, err);
+                }
+            },
         })
     }
 }
@@ -329,19 +321,12 @@ impl Mampler {
             }
 
             NoteEvent::MidiCC {
-                channel,
-                cc,
-                value,
-                ..
+                channel, cc, value, ..
             } => {
                 self.handle_cc(channel, cc, value);
             }
 
-            NoteEvent::MidiPitchBend {
-                channel,
-                value,
-                ..
-            } => {
+            NoteEvent::MidiPitchBend { channel, value, .. } => {
                 let ch = (channel as usize).min(15);
 
                 let centered = if (0.0..=1.0).contains(&value) {
@@ -460,7 +445,11 @@ impl Mampler {
             region.loop_end,
             self.params.reverse.value(),
             one_shot,
-            if one_shot { LoopMode::Off } else { self.params.loop_mode.value() },
+            if one_shot {
+                LoopMode::Off
+            } else {
+                self.params.loop_mode.value()
+            },
             rate,
             previous_rate,
             self.params.glide_ms.value(),
@@ -516,7 +505,8 @@ impl Mampler {
 
                 if was_down && !is_down {
                     for voice in &mut self.voices {
-                        if voice.active && voice.channel == channel && voice.pending_sustain_release {
+                        if voice.active && voice.channel == channel && voice.pending_sustain_release
+                        {
                             voice.release();
                         }
                     }
@@ -653,8 +643,14 @@ impl Mampler {
         loop_end = loop_end.clamp(loop_start + 1, end);
 
         if self.params.snap_zero.value() {
-            loop_start = self.current_wave.snap_to_zero(loop_start).clamp(start, end - 1);
-            loop_end = self.current_wave.snap_to_zero(loop_end).clamp(loop_start + 1, end);
+            loop_start = self
+                .current_wave
+                .snap_to_zero(loop_start)
+                .clamp(start, end - 1);
+            loop_end = self
+                .current_wave
+                .snap_to_zero(loop_end)
+                .clamp(loop_start + 1, end);
         }
 
         ComputedRegion {

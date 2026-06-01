@@ -1076,6 +1076,7 @@ version = "0.3.1"
 dependencies = [
  "crossbeam",
  "dirs",
+ "ndk-context",
  "nih_plug",
  "rlobkit-core",
  "rlobkit-dialogs",
@@ -1585,7 +1586,7 @@ dependencies = [
 [[package]]
 name = "rlobkit-core"
 version = "0.2.0"
-source = "git+https://github.com/mlm-games/rlobkit#900d9c1eb45c48dffa632494f645b68bcdbd2e63"
+source = "git+https://github.com/mlm-games/rlobkit#3a02a0093cd4def7c027e764bd80d1f93068d01b"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1598,7 +1599,7 @@ dependencies = [
 [[package]]
 name = "rlobkit-dialogs"
 version = "0.2.0"
-source = "git+https://github.com/mlm-games/rlobkit#900d9c1eb45c48dffa632494f645b68bcdbd2e63"
+source = "git+https://github.com/mlm-games/rlobkit#3a02a0093cd4def7c027e764bd80d1f93068d01b"
 dependencies = [
  "async-trait",
  "bytes",

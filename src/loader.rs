@@ -179,7 +179,37 @@ fn pick_audio_file() -> Result<(PathBuf, String, bool), String> {
 }
 
 #[cfg(target_os = "android")]
+fn ensure_android_context() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        let already = std::panic::catch_unwind(|| ndk_context::android_context()).is_ok();
+        if already {
+            return;
+        }
+
+        let vm_hex = std::env::var("RLOBKIT_ANDROID_VM").ok();
+        let ctx_hex = std::env::var("RLOBKIT_ANDROID_CTX").ok();
+        if let (Some(vm_hex), Some(ctx_hex)) = (vm_hex, ctx_hex) {
+            let parse = |s: &str| usize::from_str_radix(s.trim_start_matches("0x"), 16);
+            if let (Ok(vm), Ok(ctx)) = (parse(&vm_hex), parse(&ctx_hex)) {
+                unsafe {
+                    ndk_context::initialize_android_context(vm as *mut _, ctx as *mut _);
+                }
+                nih_plug::nih_log!("mampler: ndk-context initialized from host env vars");
+            } else {
+                nih_plug::nih_log!("mampler: failed to parse host JVM pointers");
+            }
+        } else {
+            nih_plug::nih_log!("mampler: ndk-context not set and no RLOBKIT_ANDROID_* env vars");
+        }
+    });
+}
+
+#[cfg(target_os = "android")]
 fn pick_audio_file() -> Result<(PathBuf, String, bool), String> {
+    ensure_android_context();
     use rlobkit_dialogs::{RlobKit, RlobKitType};
 
     let runtime = tokio::runtime::Builder::new_current_thread()
