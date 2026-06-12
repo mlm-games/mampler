@@ -33,10 +33,10 @@ symphonia = { version = "0.6", default-features = false, features = [
     "adpcm",
 ] }
 
-rlobkit-core = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-core" }
-rlobkit-dialogs = { git = "https://github.com/mlm-games/rlobkit", package = "rlobkit-dialogs" }
+rlobkit-core = "0.2.3"
+rlobkit-dialogs = "0.2.3"
 
-symphonia-adapter-mousiki = { git = "https://github.com/mlm-games/symphonia-adapter-mousiki" }
+symphonia-adapter-oporus = "0.1.3"
 
 tokio = { version = "1", default-features = false, features = ["rt"] }
 
